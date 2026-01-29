@@ -1,0 +1,102 @@
+This is the Advanced SELECT question from the HackerRank;
+---
+
+# SQL Challenge: Pivoting Occupations
+
+## 📌 Problem Description
+
+The goal is to pivot the `Occupation` column in the **OCCUPATIONS** table so that each `Name` 
+is displayed underneath its corresponding profession. 
+The output must consist of four columns: **Doctor**, **Professor**, **Singer**, and **Actor**, in that specific order.
+
+Names under each column must be sorted **alphabetically**. If an occupation has fewer entries than others, 
+the remaining cells must be filled with `NULL`.
+
+---
+
+## 📋 Sample Input & Output
+
+### **Input (OCCUPATIONS Table)**
+
+| Name | Occupation |
+| --- | --- |
+| Samantha | Doctor |
+| Julia | Actor |
+| Maria | Actor |
+| Meera | Singer |
+| Ashley | Professor |
+| Ketty | Professor |
+| Christeen | Professor |
+| Jane | Actor |
+| Jenny | Doctor |
+| Priya | Singer |
+
+### **Output (Pivoted Result)**
+
+| Doctor | Professor | Singer | Actor |
+| --- | --- | --- | --- |
+| Jenny | Ashley | Meera | Jane |
+| Samantha | Christeen | Priya | Julia |
+| NULL | Ketty | NULL | Maria |
+
+
+---
+
+## 💻 The Solution (MySQL / SQL Server)
+
+```sql
+SELECT 
+    MAX(CASE WHEN Occupation = 'Doctor' THEN Name ELSE NULL END) AS Doctor,
+    MAX(CASE WHEN Occupation = 'Professor' THEN Name ELSE NULL END) AS Professor,
+    MAX(CASE WHEN Occupation = 'Singer' THEN Name ELSE NULL END) AS Singer,
+    MAX(CASE WHEN Occupation = 'Actor' THEN Name ELSE NULL END) AS Actor
+FROM (
+    SELECT 
+        Name, 
+        Occupation, 
+        ROW_NUMBER() OVER(PARTITION BY Occupation ORDER BY Name) AS row_order
+    FROM OCCUPATIONS 
+) AS temp_df
+GROUP BY row_order
+;
+
+```
+
+---
+
+## 🧠 Logic Breakdown & Key Concepts
+
+### 1. Generating "Tickets" with `ROW_NUMBER()`
+
+Standard SQL is row-oriented. To force names from different occupations into the same horizontal row, 
+we need a common "ID" to link them. We use a **Window Function** to create this:
+
+* **`PARTITION BY Occupation`**: Creates separate "queues" for each profession.
+* **`ORDER BY Name`**: Ensures the names are sorted alphabetically within their respective groups.
+* **`ROW_NUMBER()`**: Assigns a sequence (1, 2, 3...) to each person.
+
+> **Result**: The first alphabetical Doctor, Professor, Singer, and Actor all now share the same `row_order = 1`.
+
+### 2. Vertical Expansion with `CASE WHEN`
+
+We define four new columns. For every record, the `CASE` statement places the name in its correct column 
+while leaving the others as `NULL`. Before the final step, the data is "sparse," appearing like a staircase.
+
+### 3. Collapsing Rows with `MAX()` and `GROUP BY`
+
+To turn the "staircase" into a clean table, we group the results by `row_order`.
+
+* **`GROUP BY row_order`**: Aligns all individuals with the same rank (e.g., all "1st place" names) into a single row.
+* **`MAX()`**: Since each column in a specific group contains only **one name** and several **NULLs**, 
+the `MAX()` function ignores the `NULLs` and "squeezes" the name into the final cell.
+
+---
+
+## 💡 Key Takeaways
+
+* **Window Functions (`OVER`)**: Allow us to perform calculations across a set of rows (like ranking or numbering) 
+without losing the detail of the individual rows.
+* **Aggregation as a Pivot Tool**: Combining `MAX()` and `CASE WHEN` is a robust, 
+"old-school" method to pivot data that works across almost all SQL dialects (MySQL, PostgreSQL, T-SQL).
+* **Null Handling**: Understanding that SQL aggregation functions (except `COUNT(*)`) 
+naturally ignore `NULL` values is the secret to "aligning" these columns.
